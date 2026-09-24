@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A second push to the same branch makes the first run's answer irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (.NET 8)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Restore
+        run: dotnet restore OrderIntake.sln
+
+      # The projects build with TreatWarningsAsErrors, so a warning fails here
+      # rather than accumulating until nobody reads the build output any more.
+      - name: Build
+        run: dotnet build OrderIntake.sln --configuration Release --no-restore
+
+      - name: Test
+        run: >
+          dotnet test OrderIntake.sln
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory ./artifacts/test-results
+
+      - name: Publish test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-test-results
+          path: ./artifacts/test-results
+          if-no-files-found: ignore
+
+  frontend:
+    name: Frontend (Angular 18)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      # Headless Chrome is preinstalled on the GitHub runner image, so the
+      # Karma run needs no extra setup step.
+      - name: Test
+        run: npm test
+
+  containers:
+    name: Container images
+    runs-on: ubuntu-latest
+    # Only worth the minutes once the code itself is known good.
+    needs: [backend, frontend]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build API image
+        run: docker build -f Dockerfile.api -t orderintake-api:ci .
+
+      - name: Build web image
+        run: docker build -f web/Dockerfile -t orderintake-web:ci ./web

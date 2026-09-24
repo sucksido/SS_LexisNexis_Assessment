@@ -1,0 +1,121 @@
+@host = http://localhost:5080
+
+### Health
+GET {{host}}/health
+
+### The status graph the UI drives its buttons from
+GET {{host}}/api/orders/statuses
+
+### The next reference, as the intake form fetches it. Call it twice and you get
+### two different numbers — it is a counter, not a reservation, and nothing is
+### held. The requests below deliberately ignore it and bring their own reference,
+### which the API accepts: that is the integration path the form does not use.
+GET {{host}}/api/orders/next-reference
+
+### Submit an order. Expect 201 Created, X-Idempotent-Replay: false
+# @name submit
+POST {{host}}/api/orders
+Content-Type: application/json
+
+{
+  "externalReference": "PO-DEMO-1",
+  "currency": "USD",
+  "notes": "Recorded from the .http file.",
+  "customer": { "email": "sam@contoso.com", "name": "Sam Carter" },
+  "lines": [
+    { "sku": "KB-001", "name": "Mechanical Keyboard", "quantity": 2, "unitPrice": 89.99 },
+    { "sku": "MS-014", "name": "Wireless Mouse",      "quantity": 3, "unitPrice": 24.50 }
+  ]
+}
+
+### THE DEMO: send exactly the same thing again.
+### Expect 200 OK, X-Idempotent-Replay: true, identical id. Still one order.
+POST {{host}}/api/orders
+Content-Type: application/json
+
+{
+  "externalReference": "PO-DEMO-1",
+  "currency": "USD",
+  "notes": "A different note. Cosmetic, so still the same order.",
+  "customer": { "email": "sam@contoso.com", "name": "Sam Carter" },
+  "lines": [
+    { "sku": "MS-014", "name": "Wireless Mouse",      "quantity": 3, "unitPrice": 24.50 },
+    { "sku": "KB-001", "name": "Mechanical Keyboard", "quantity": 2, "unitPrice": 89.99 }
+  ]
+}
+
+### Same reference, different quantity. That is a different order wearing a
+### borrowed reference. Expect 409 REFERENCE_REUSED_WITH_DIFFERENT_CONTENT.
+POST {{host}}/api/orders
+Content-Type: application/json
+
+{
+  "externalReference": "PO-DEMO-1",
+  "currency": "USD",
+  "customer": { "email": "sam@contoso.com", "name": "Sam Carter" },
+  "lines": [
+    { "sku": "KB-001", "name": "Mechanical Keyboard", "quantity": 99, "unitPrice": 89.99 }
+  ]
+}
+
+### Same reference, different customer. Legitimately a different order.
+### Expect 201 Created.
+POST {{host}}/api/orders
+Content-Type: application/json
+
+{
+  "externalReference": "PO-DEMO-1",
+  "currency": "USD",
+  "customer": { "email": "other@contoso.com", "name": "Other Customer" },
+  "lines": [
+    { "sku": "KB-001", "name": "Mechanical Keyboard", "quantity": 1, "unitPrice": 89.99 }
+  ]
+}
+
+### Validation: negative price, zero quantity, bad currency, repeated SKU.
+### Expect 400 with every problem listed at once.
+POST {{host}}/api/orders
+Content-Type: application/json
+
+{
+  "externalReference": "",
+  "currency": "DOLLARS",
+  "customer": { "email": "not-an-email", "name": "" },
+  "lines": [
+    { "sku": "A", "name": "Thing", "quantity": 0,  "unitPrice": -5 },
+    { "sku": "A", "name": "Thing", "quantity": 1,  "unitPrice": 1.005 }
+  ]
+}
+
+### List, newest first
+GET {{host}}/api/orders?page=1&pageSize=20
+
+### Server-side filtering
+GET {{host}}/api/orders?status=Pending&search=sam
+
+### Fetch one order
+GET {{host}}/api/orders/{{submit.response.body.id}}
+
+### Confirm it. Expect 200, status Confirmed.
+PUT {{host}}/api/orders/{{submit.response.body.id}}/status
+Content-Type: application/json
+
+{ "status": "Confirmed" }
+
+### Confirm it again. Already in that status, so 200 with X-Status-Changed: false.
+PUT {{host}}/api/orders/{{submit.response.body.id}}/status
+Content-Type: application/json
+
+{ "status": "Confirmed" }
+
+### Fulfil it.
+PUT {{host}}/api/orders/{{submit.response.body.id}}/status
+Content-Type: application/json
+
+{ "status": "Fulfilled" }
+
+### Now try to cancel a fulfilled order. Expect 409 with allowedTransitions: [].
+PUT {{host}}/api/orders/{{submit.response.body.id}}/status
+Content-Type: application/json
+
+{ "status": "Cancelled" }

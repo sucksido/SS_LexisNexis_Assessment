@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/.angular/
+**/out-tsc/
+**/.git/
+**/.github/
+**/.vs/
+**/.idea/
+**/*.user
+**/*.db
+docs/
+*.md

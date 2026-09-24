@@ -1,0 +1,43 @@
+# --- .NET ---------------------------------------------------------------
+bin/
+obj/
+artifacts/
+*.user
+*.suo
+.vs/
+TestResults/
+*.trx
+*.coverage
+*.coverlet.json
+
+# The SQLite database is generated on first run; it is state, not source.
+*.db
+*.db-shm
+*.db-wal
+
+# --- Node / Angular ------------------------------------------------------
+node_modules/
+web/dist/
+web/.angular/
+web/out-tsc/
+npm-debug.log*
+yarn-error.log*
+
+# --- Editors and OS ------------------------------------------------------
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# --- Personal notes ------------------------------------------------------
+# Preparation notes for the walkthrough video and for submission. Mine, not
+# the reviewers'.
+docs/VIDEO-GUIDE.md
+docs/PRE-SUBMISSION.md
+
+# --- Local secrets -------------------------------------------------------
+*.local.json
+.env
+.env.*
+!.env.example

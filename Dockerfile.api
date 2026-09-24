@@ -1,0 +1,59 @@
+# -----------------------------------------------------------------------------
+# API image. Build context is the repository root.
+#
+# The restore step copies only the project files first. Source changes are
+# constant and package lists rarely move, so keeping them in separate layers
+# means an edit to a .cs file does not re-download every NuGet package.
+# -----------------------------------------------------------------------------
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+COPY OrderIntake.sln ./
+COPY src/OrderIntake.Domain/OrderIntake.Domain.csproj src/OrderIntake.Domain/
+COPY src/OrderIntake.Application/OrderIntake.Application.csproj src/OrderIntake.Application/
+COPY src/OrderIntake.Infrastructure/OrderIntake.Infrastructure.csproj src/OrderIntake.Infrastructure/
+COPY src/OrderIntake.Api/OrderIntake.Api.csproj src/OrderIntake.Api/
+COPY tests/OrderIntake.UnitTests/OrderIntake.UnitTests.csproj tests/OrderIntake.UnitTests/
+
+RUN dotnet restore OrderIntake.sln
+
+COPY . .
+
+# Tests run inside the image build on purpose: an image that ships is an image
+# whose tests passed, with no way to skip the step by accident.
+RUN dotnet test tests/OrderIntake.UnitTests/OrderIntake.UnitTests.csproj \
+    --configuration Release --no-restore
+
+RUN dotnet publish src/OrderIntake.Api/OrderIntake.Api.csproj \
+    --configuration Release --no-restore --output /app/publish
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
+
+# curl is here only so compose can run a health check against /health. The
+# aspnet image ships neither curl nor wget, and a health check that can never
+# pass is worse than none: compose waits on `service_healthy` and the stack
+# never starts. A production image would use a distroless base and let the
+# orchestrator probe over HTTP itself instead.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# The SQLite file lives here when compose mounts a volume at /data. Creating it
+# and handing it to the runtime user *before* dropping privileges matters: a
+# named volume inherits the ownership of the directory it shadows, so doing
+# this the other way round leaves the app unable to write its own database.
+RUN mkdir -p /data && chown -R $APP_UID:$APP_UID /data
+
+# Runs as a non-root user. The aspnet image ships one; using it costs nothing
+# and removes a whole class of container escape from the table.
+USER $APP_UID
+
+ENV ASPNETCORE_URLS=http://+:8080 \
+    ASPNETCORE_ENVIRONMENT=Development
+
+EXPOSE 8080
+
+COPY --from=build /app/publish .
+
+ENTRYPOINT ["dotnet", "OrderIntake.Api.dll"]
