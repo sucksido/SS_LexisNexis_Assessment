@@ -31,12 +31,8 @@ yarn-error.log*
 Thumbs.db
 
 # --- Personal notes ------------------------------------------------------
-# Preparation notes for the walkthrough video and for submission. Mine, not
-# the reviewers'.
+# Preparation notes for the walkthrough video. Mine, not the reviewers'.
 docs/VIDEO-GUIDE.md
-docs/PRE-SUBMISSION.md
-Video-Prep.docx
-~$*.docx
 
 # --- Local secrets -------------------------------------------------------
 *.local.json

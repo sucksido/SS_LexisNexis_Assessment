@@ -10,7 +10,7 @@ Everything else here is competent CRUD. That sentence is the actual problem, and
 
 - **Backend** — C# / ASP.NET Core 8 (LTS), clean layered architecture, EF Core 8, FluentValidation, xUnit
 - **Frontend** — Angular 18, standalone components, signals, reactive forms, strict TypeScript 5.5
-- **Docs** — [SOLUTION.md](SOLUTION.md) for design and trade-offs, [AI-USAGE.md](AI-USAGE.md) for how AI tooling was used
+- **Docs** — [SOLUTION.md](SOLUTION.md) for the design, the trade-offs and the limitations
 
 ---
 
